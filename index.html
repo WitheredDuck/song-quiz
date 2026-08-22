@@ -47,11 +47,18 @@
             audio.controls = true;
             audio.autoplay = true;
             audio.src = randomTrack.url;
+            audio.addEventListener("loadedmetadata", () => {
+                audio.currentTime = Math.random() * (audio.duration - 10);
+                audio.play()
+                    .then(() => {
+                        setTimeout(() => audio.pause(), 10000);
+                    })
+                    .catch(() => {});
+            }, { once: true });
             const item = document.createElement("li");
             item.textContent = randomTrack.name;
             item.append(" ", audio);
             songs.replaceChildren(item);
-            audio.play().catch(() => {});
         });
     </script>
 </body>
