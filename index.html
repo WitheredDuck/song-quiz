@@ -135,6 +135,35 @@
         font-size: 1.15rem;
     }
 
+    .song-stats {
+        margin: 24px 0;
+        padding: 16px 20px;
+        border-left: 3px solid var(--accent);
+        background: #f7eee4;
+        font: 0.9rem/1.5 Arial, sans-serif;
+    }
+
+    .song-stats h2 {
+        margin: 0 0 10px;
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .song-stats ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+
+    .song-stats li {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 4px 0;
+        border-top: 1px solid var(--line);
+    }
+
     .another-button {
         padding: 13px 18px;
         border: 0;
@@ -210,7 +239,7 @@
 
                 const audioBlob = await entry.async("blob");
                 const audioUrl = URL.createObjectURL(audioBlob);
-                tracks.push({ name: entry.name.split("/").pop(), url: audioUrl });
+                tracks.push({ name: entry.name.split("/").pop(), url: audioUrl, played: 0, wrong: 0 });
             }
 
             if (tracks.length === 0) {
@@ -240,6 +269,25 @@
 
             const feedback = document.createElement("p");
 			feedback.className = "quiz-feedback";
+            const stats = document.createElement("section");
+            stats.className = "song-stats";
+            const statsHeading = document.createElement("h2");
+            statsHeading.textContent = "Song stats";
+            const statsList = document.createElement("ul");
+            stats.append(statsHeading, statsList);
+
+            const updateStats = () => {
+                statsList.replaceChildren(...tracks.map(track => {
+                    const row = document.createElement("li");
+                    const name = document.createElement("span");
+                    name.textContent = track.name;
+                    const count = document.createElement("span");
+                    count.textContent = `${track.played} played / ${track.wrong} wrong`;
+                    row.append(name, count);
+                    return row;
+                }));
+            };
+
             const anotherButton = document.createElement("button");
 			anotherButton.className = "another-button";
             anotherButton.type = "button";
@@ -250,7 +298,22 @@
 
             const startRound = () => {
                 clearTimeout(stopTimer);
-                currentTrack = tracks[Math.floor(Math.random() * tracks.length)];
+                const weightedTracks = tracks.map(track => ({
+                    track,
+                    weight: (1 / (track.played + 1)) * (1 + track.wrong * 0.1)
+                }));
+                const totalWeight = weightedTracks.reduce((total, item) => total + item.weight, 0);
+                let selectedWeight = Math.random() * totalWeight;
+                currentTrack = weightedTracks[weightedTracks.length - 1].track;
+                for (const item of weightedTracks) {
+                    selectedWeight -= item.weight;
+                    if (selectedWeight <= 0) {
+                        currentTrack = item.track;
+                        break;
+                    }
+                }
+                currentTrack.played += 1;
+                updateStats();
                 songSelect.value = "";
                 feedback.textContent = "";
                 anotherButton.hidden = true;
@@ -271,13 +334,16 @@
                 if (songSelect.value === currentTrack.url) {
                     feedback.textContent = "Correct!";
                 } else {
+                    currentTrack.wrong += 1;
                     feedback.textContent = `Incorrect. The correct song is ${currentTrack.name}.`;
+                    updateStats();
                 }
                 anotherButton.hidden = false;
             });
 
             anotherButton.addEventListener("click", startRound);
-            document.querySelector("main").append(audio, songSelect, feedback, anotherButton);
+            document.querySelector("main").append(audio, songSelect, feedback, stats, anotherButton);
+            updateStats();
             startRound();
         });
     </script>
