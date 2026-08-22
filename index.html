@@ -26,7 +26,7 @@
             const durationInput = document.querySelector("#play-duration");
             const playDuration = Number(durationInput.value);
             if (!Number.isFinite(playDuration) || playDuration <= 0) {
-                durationInput.value = 10;
+                durationInput.value = 15;
                 durationInput.focus();
                 return;
             }
@@ -49,32 +49,64 @@
                 return;
             }
 
-            const randomTrack = tracks[Math.floor(Math.random() * tracks.length)];
             const audio = document.createElement("audio");
             audio.controls = true;
             audio.autoplay = true;
-            audio.src = randomTrack.url;
-            audio.addEventListener("loadedmetadata", () => {
-                const latestStart = Math.max(0, audio.duration - playDuration);
-                audio.currentTime = Math.random() * latestStart;
-                audio.play()
-                    .then(() => {
-                        setTimeout(() => audio.pause(), playDuration * 1000);
-                    })
-                    .catch(() => {});
-            }, { once: true });
 
             const songSelect = document.createElement("select");
             songSelect.id = "song-select";
+            const placeholder = document.createElement("option");
+            placeholder.textContent = "Choose the song";
+            placeholder.value = "";
+            placeholder.disabled = true;
+            placeholder.selected = true;
+            songSelect.appendChild(placeholder);
             for (const track of tracks) {
                 const option = document.createElement("option");
                 option.value = track.url;
                 option.textContent = track.name;
-                option.selected = track === randomTrack;
                 songSelect.appendChild(option);
             }
 
-            document.querySelector("main").append(audio, songSelect);
+            const feedback = document.createElement("p");
+            const anotherButton = document.createElement("button");
+            anotherButton.type = "button";
+            anotherButton.textContent = "Another song";
+            anotherButton.hidden = true;
+            let currentTrack;
+            let stopTimer;
+
+            const startRound = () => {
+                clearTimeout(stopTimer);
+                currentTrack = tracks[Math.floor(Math.random() * tracks.length)];
+                songSelect.value = "";
+                feedback.textContent = "";
+                anotherButton.hidden = true;
+                audio.pause();
+                audio.src = currentTrack.url;
+                audio.addEventListener("loadedmetadata", () => {
+                    const latestStart = Math.max(0, audio.duration - playDuration);
+                    audio.currentTime = Math.random() * latestStart;
+                    audio.play()
+                        .then(() => {
+                            stopTimer = setTimeout(() => audio.pause(), playDuration * 1000);
+                        })
+                        .catch(() => {});
+                }, { once: true });
+            };
+
+            songSelect.addEventListener("change", () => {
+                if (songSelect.value === currentTrack.url) {
+                    feedback.textContent = "Correct!";
+                } else {
+                    feedback.textContent = `Incorrect. The correct song is ${currentTrack.name}.`;
+                }
+                anotherButton.hidden = false;
+            });
+
+            anotherButton.addEventListener("click", startRound);
+            document.querySelector("main").append(audio, songSelect, feedback, anotherButton);
+            startRound();
         });
     </script>
 </body>
