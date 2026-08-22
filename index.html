@@ -63,6 +63,18 @@
                     })
                     .catch(() => {});
             }, { once: true });
+
+            const songSelect = document.createElement("select");
+            songSelect.id = "song-select";
+            for (const track of tracks) {
+                const option = document.createElement("option");
+                option.value = track.url;
+                option.textContent = track.name;
+                option.selected = track === randomTrack;
+                songSelect.appendChild(option);
+            }
+
+            document.querySelector("main").append(audio, songSelect);
         });
     </script>
 </body>
