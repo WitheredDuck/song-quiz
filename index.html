@@ -6,32 +6,6 @@
 	<title>Song Quiz</title>
 </head>
 
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script>
-document.querySelector("#zip-upload").addEventListener("change", async event => {
-    const zipFile = event.target.files[0];
-    if (!zipFile) return;
-
-    const zip = await JSZip.loadAsync(zipFile);
-    const songs = document.querySelector("#songs");
-
-    for (const entry of Object.values(zip.files)) {
-        if (entry.dir || !entry.name.toLowerCase().endsWith(".mp3")) continue;
-
-        const audioBlob = await entry.async("blob");
-        const audioUrl = URL.createObjectURL(audioBlob);
-
-        const item = document.createElement("li");
-        const audio = document.createElement("audio");
-        audio.controls = true;
-        audio.src = audioUrl;
-
-        item.textContent = entry.name.split("/").pop();
-        item.append(" ", audio);
-        songs.appendChild(item);
-    }
-});
-</script>
 <body>
 	<header>
 		<h1>Song Quiz</h1>
@@ -41,5 +15,44 @@ document.querySelector("#zip-upload").addEventListener("change", async event => 
         <input id="zip-upload" type="file" accept=".zip,audio/mpeg" />
         <ul id="songs"></ul>
 	</main>
+
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script>
+        document.querySelector("#zip-upload").addEventListener("change", async event => {
+            const zipFile = event.target.files[0];
+            if (!zipFile) return;
+
+            event.target.hidden = true;
+
+            const zip = await JSZip.loadAsync(zipFile);
+            const songs = document.querySelector("#songs");
+            const tracks = [];
+
+            for (const entry of Object.values(zip.files)) {
+                if (entry.dir || !entry.name.toLowerCase().endsWith(".mp3")) continue;
+
+                const audioBlob = await entry.async("blob");
+                const audioUrl = URL.createObjectURL(audioBlob);
+                tracks.push({ name: entry.name.split("/").pop(), url: audioUrl });
+            }
+
+            if (tracks.length === 0) {
+                event.target.hidden = false;
+                songs.textContent = "No MP3 files found in that ZIP.";
+                return;
+            }
+
+            const randomTrack = tracks[Math.floor(Math.random() * tracks.length)];
+            const audio = document.createElement("audio");
+            audio.controls = true;
+            audio.autoplay = true;
+            audio.src = randomTrack.url;
+            const item = document.createElement("li");
+            item.textContent = randomTrack.name;
+            item.append(" ", audio);
+            songs.replaceChildren(item);
+            audio.play().catch(() => {});
+        });
+    </script>
 </body>
 </html>
