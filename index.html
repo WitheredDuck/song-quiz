@@ -12,8 +12,9 @@
 	</header>
 
 	<main>
+        <label for="play-duration">Play duration (seconds)</label>
+        <input id="play-duration" type="number" min="1" step="1" value="10" />
         <input id="zip-upload" type="file" accept=".zip,audio/mpeg" />
-        <ul id="songs"></ul>
 	</main>
 
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -22,10 +23,17 @@
             const zipFile = event.target.files[0];
             if (!zipFile) return;
 
+            const durationInput = document.querySelector("#play-duration");
+            const playDuration = Number(durationInput.value);
+            if (!Number.isFinite(playDuration) || playDuration <= 0) {
+                durationInput.value = 10;
+                durationInput.focus();
+                return;
+            }
+
             event.target.hidden = true;
 
             const zip = await JSZip.loadAsync(zipFile);
-            const songs = document.querySelector("#songs");
             const tracks = [];
 
             for (const entry of Object.values(zip.files)) {
@@ -38,7 +46,6 @@
 
             if (tracks.length === 0) {
                 event.target.hidden = false;
-                songs.textContent = "No MP3 files found in that ZIP.";
                 return;
             }
 
@@ -48,17 +55,14 @@
             audio.autoplay = true;
             audio.src = randomTrack.url;
             audio.addEventListener("loadedmetadata", () => {
-                audio.currentTime = Math.random() * (audio.duration - 10);
+                const latestStart = Math.max(0, audio.duration - playDuration);
+                audio.currentTime = Math.random() * latestStart;
                 audio.play()
                     .then(() => {
-                        setTimeout(() => audio.pause(), 10000);
+                        setTimeout(() => audio.pause(), playDuration * 1000);
                     })
                     .catch(() => {});
             }, { once: true });
-            const item = document.createElement("li");
-            item.textContent = randomTrack.name;
-            item.append(" ", audio);
-            songs.replaceChildren(item);
         });
     </script>
 </body>
