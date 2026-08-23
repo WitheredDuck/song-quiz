@@ -10,7 +10,7 @@
             --ink: #17212b;
             --muted: #65717b;
             --paper: #fff2fc;
-            --panel: #4e4c4c;
+            --panel: #474747;
             --accent: #ffaaeb;
             --accent-dark: #993999;
             --line: #ead2e4;
@@ -98,8 +98,8 @@
     #zip-upload {
         width: 100%;
         padding: 18px;
-        border: 1px dashed #c7aac3;
-        background: #f7e4f3;
+        border: 1px dashed #ceb8cb;
+        background: #f7e4f6;
         color: var(--muted);
         font: 0.95rem Arial, sans-serif;
     }
@@ -150,6 +150,11 @@
         text-transform: uppercase;
     }
 
+    .overall-stats {
+        margin: 0 0 12px;
+        color: var(--muted);
+    }
+
     .song-stats ul {
         margin: 0;
         padding: 0;
@@ -173,6 +178,23 @@
         letter-spacing: 0.08em;
         text-transform: uppercase;
         cursor: pointer;
+    }
+
+    .submit-button {
+        margin: 16px 10px 0 0;
+        padding: 13px 18px;
+        border: 0;
+        background: var(--ink);
+        color: white;
+        font: 700 0.8rem Arial, sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        cursor: pointer;
+    }
+
+    .submit-button:disabled {
+        background: #b9b1a9;
+        cursor: not-allowed;
     }
 
     .another-button:hover,
@@ -239,7 +261,7 @@
 
                 const audioBlob = await entry.async("blob");
                 const audioUrl = URL.createObjectURL(audioBlob);
-                tracks.push({ name: entry.name.split("/").pop(), url: audioUrl, played: 0, wrong: 0 });
+                tracks.push({ name: entry.name.split("/").pop(), url: audioUrl, played: 0, correct: 0, wrong: 0, recentResults: [] });
             }
 
             if (tracks.length === 0) {
@@ -273,20 +295,38 @@
             stats.className = "song-stats";
             const statsHeading = document.createElement("h2");
             statsHeading.textContent = "Song stats";
+            const overallStats = document.createElement("p");
+            overallStats.className = "overall-stats";
             const statsList = document.createElement("ul");
-            stats.append(statsHeading, statsList);
+            stats.append(statsHeading, overallStats, statsList);
+            let totalAnswers = 0;
+            let totalCorrect = 0;
 
             const updateStats = () => {
+                const overallConsistency = totalAnswers === 0
+                    ? "No answers yet"
+                    : `${Math.round((totalCorrect / totalAnswers) * 100)}% overall consistency`;
+                overallStats.textContent = `${totalAnswers} submitted / ${overallConsistency}`;
                 statsList.replaceChildren(...tracks.map(track => {
                     const row = document.createElement("li");
                     const name = document.createElement("span");
                     name.textContent = track.name;
                     const count = document.createElement("span");
-                    count.textContent = `${track.played} played / ${track.wrong} wrong`;
+                    const recentCorrect = track.recentResults.filter(Boolean).length;
+                    const recentConsistency = track.recentResults.length === 0
+                        ? "no recent answers"
+                        : `${Math.round((recentCorrect / track.recentResults.length) * 100)}% last ${track.recentResults.length}`;
+                    count.textContent = `${track.played} played / ${track.correct} correct / ${recentConsistency}`;
                     row.append(name, count);
                     return row;
                 }));
             };
+
+            const submitButton = document.createElement("button");
+			submitButton.className = "submit-button";
+            submitButton.type = "button";
+            submitButton.textContent = "Submit answer";
+            submitButton.disabled = true;
 
             const anotherButton = document.createElement("button");
 			anotherButton.className = "another-button";
@@ -295,6 +335,7 @@
             anotherButton.hidden = true;
             let currentTrack;
             let stopTimer;
+            let answerSubmitted = false;
 
             const startRound = () => {
                 clearTimeout(stopTimer);
@@ -312,10 +353,10 @@
                         break;
                     }
                 }
-                currentTrack.played += 1;
-                updateStats();
                 songSelect.value = "";
                 feedback.textContent = "";
+                submitButton.disabled = true;
+                answerSubmitted = false;
                 anotherButton.hidden = true;
                 audio.pause();
                 audio.src = currentTrack.url;
@@ -331,18 +372,33 @@
             };
 
             songSelect.addEventListener("change", () => {
-                if (songSelect.value === currentTrack.url) {
+                submitButton.disabled = false;
+            });
+
+            submitButton.addEventListener("click", () => {
+                if (!songSelect.value || answerSubmitted) return;
+
+                const isCorrect = songSelect.value === currentTrack.url;
+                answerSubmitted = true;
+                submitButton.disabled = true;
+                currentTrack.played += 1;
+                currentTrack.correct += isCorrect ? 1 : 0;
+                currentTrack.wrong += isCorrect ? 0 : 1;
+                currentTrack.recentResults.push(isCorrect);
+                if (currentTrack.recentResults.length > 5) currentTrack.recentResults.shift();
+                totalAnswers += 1;
+                totalCorrect += isCorrect ? 1 : 0;
+                if (isCorrect) {
                     feedback.textContent = "Correct!";
                 } else {
-                    currentTrack.wrong += 1;
                     feedback.textContent = `Incorrect. The correct song is ${currentTrack.name}.`;
-                    updateStats();
                 }
+                updateStats();
                 anotherButton.hidden = false;
             });
 
             anotherButton.addEventListener("click", startRound);
-            document.querySelector("main").append(audio, songSelect, feedback, stats, anotherButton);
+            document.querySelector("main").append(audio, songSelect, submitButton, feedback, stats, anotherButton);
             updateStats();
             startRound();
         });
