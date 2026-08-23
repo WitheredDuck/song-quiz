@@ -62,22 +62,26 @@
     }
 
     main {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 280px;
+        gap: 32px;
         padding-bottom: 72px;
     }
 
     main::before {
         display: block;
+        grid-column: 1 / -1;
         margin-bottom: 28px;
         border-top: 1px solid var(--line);
         content: "";
     }
 
-    main > label,
-    main > input {
+    .quiz-panel > label,
+    .quiz-panel > input {
         display: block;
     }
 
-    main > label {
+    .quiz-panel > label {
         margin-bottom: 8px;
         font: 700 0.78rem/1.2 Arial, sans-serif;
         letter-spacing: 0.08em;
@@ -136,7 +140,8 @@
     }
 
     .song-stats {
-        margin: 24px 0;
+        align-self: start;
+        margin: 0;
         padding: 16px 20px;
         border-left: 3px solid var(--accent);
         background: #f7eee4;
@@ -162,11 +167,18 @@
     }
 
     .song-stats li {
-        display: flex;
-        justify-content: space-between;
-        gap: 16px;
+        display: block;
         padding: 4px 0;
         border-top: 1px solid var(--line);
+    }
+
+    .song-stats li span {
+        display: block;
+    }
+
+    .song-stats li span:last-child {
+        color: var(--muted);
+        font-size: 0.78rem;
     }
 
     .another-button {
@@ -202,6 +214,11 @@
         background: var(--accent-dark);
     }
 
+    .answer-time {
+        color: var(--muted);
+        font: 0.9rem Arial, sans-serif;
+    }
+
     input:focus-visible,
     select:focus-visible,
     button:focus-visible {
@@ -213,6 +230,10 @@
         header,
         main {
             width: min(100% - 28px, 760px);
+        }
+
+        main {
+            display: block;
         }
 
         header {
@@ -232,9 +253,11 @@
 	</header>
 
 	<main>
+		<section class="quiz-panel">
         <label for="play-duration">Play duration (seconds)</label>
         <input id="play-duration" type="number" min="1" step="1" value="10" />
         <input id="zip-upload" type="file" accept=".zip,audio/mpeg" />
+		</section>
 	</main>
 
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -301,12 +324,18 @@
             stats.append(statsHeading, overallStats, statsList);
             let totalAnswers = 0;
             let totalCorrect = 0;
+            const answerTimes = [];
+
+            const formatTime = seconds => `${seconds.toFixed(1)}s`;
 
             const updateStats = () => {
                 const overallConsistency = totalAnswers === 0
                     ? "No answers yet"
                     : `${Math.round((totalCorrect / totalAnswers) * 100)}% overall consistency`;
-                overallStats.textContent = `${totalAnswers} submitted / ${overallConsistency}`;
+                const timeSummary = answerTimes.length === 0
+                    ? "No answer times yet"
+                    : `Avg ${formatTime(answerTimes.reduce((sum, time) => sum + time, 0) / answerTimes.length)} / Best ${formatTime(Math.min(...answerTimes))} / Worst ${formatTime(Math.max(...answerTimes))}`;
+                overallStats.textContent = `${totalAnswers} submitted / ${overallConsistency} / ${timeSummary}`;
                 statsList.replaceChildren(...tracks.map(track => {
                     const row = document.createElement("li");
                     const name = document.createElement("span");
@@ -336,6 +365,7 @@
             let currentTrack;
             let stopTimer;
             let answerSubmitted = false;
+            let roundStartedAt;
 
             const startRound = () => {
                 clearTimeout(stopTimer);
@@ -363,6 +393,7 @@
                 audio.addEventListener("loadedmetadata", () => {
                     const latestStart = Math.max(0, audio.duration - playDuration);
                     audio.currentTime = Math.random() * latestStart;
+                    roundStartedAt = performance.now();
                     audio.play()
                         .then(() => {
                             stopTimer = setTimeout(() => audio.pause(), playDuration * 1000);
@@ -379,8 +410,11 @@
                 if (!songSelect.value || answerSubmitted) return;
 
                 const isCorrect = songSelect.value === currentTrack.url;
+                const answerTime = (performance.now() - roundStartedAt) / 1000;
                 answerSubmitted = true;
                 submitButton.disabled = true;
+                clearTimeout(stopTimer);
+                audio.pause();
                 currentTrack.played += 1;
                 currentTrack.correct += isCorrect ? 1 : 0;
                 currentTrack.wrong += isCorrect ? 0 : 1;
@@ -388,17 +422,20 @@
                 if (currentTrack.recentResults.length > 5) currentTrack.recentResults.shift();
                 totalAnswers += 1;
                 totalCorrect += isCorrect ? 1 : 0;
+                answerTimes.push(answerTime);
+                const timeMessage = `Time: ${formatTime(answerTime)}.`;
                 if (isCorrect) {
-                    feedback.textContent = "Correct!";
+                    feedback.textContent = `Correct! ${timeMessage}`;
                 } else {
-                    feedback.textContent = `Incorrect. The correct song is ${currentTrack.name}.`;
+                    feedback.textContent = `Incorrect. The correct song is ${currentTrack.name}. ${timeMessage}`;
                 }
                 updateStats();
                 anotherButton.hidden = false;
             });
 
             anotherButton.addEventListener("click", startRound);
-            document.querySelector("main").append(audio, songSelect, submitButton, feedback, stats, anotherButton);
+            document.querySelector(".quiz-panel").append(audio, songSelect, submitButton, feedback, anotherButton);
+            document.querySelector("main").append(stats);
             updateStats();
             startRound();
         });
