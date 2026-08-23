@@ -37,7 +37,7 @@
 
         header,
         main {
-            width: min(100% - 40px, 760px);
+            width: min(100% - 20px, 1080px);
             margin: 0 auto;
         }
 
@@ -229,7 +229,7 @@
     @media (max-width: 520px) {
         header,
         main {
-            width: min(100% - 28px, 760px);
+            width: min(100% - 12px, 1080px);
         }
 
         main {
@@ -284,7 +284,7 @@
 
                 const audioBlob = await entry.async("blob");
                 const audioUrl = URL.createObjectURL(audioBlob);
-                tracks.push({ name: entry.name.split("/").pop(), url: audioUrl, played: 0, correct: 0, wrong: 0, recentResults: [] });
+                tracks.push({ name: entry.name.split("/").pop(), url: audioUrl, played: 0, correct: 0, wrong: 0, recentResults: [], times: [] });
             }
 
             if (tracks.length === 0) {
@@ -345,7 +345,10 @@
                     const recentConsistency = track.recentResults.length === 0
                         ? "no recent answers"
                         : `${Math.round((recentCorrect / track.recentResults.length) * 100)}% last ${track.recentResults.length}`;
-                    count.textContent = `${track.played} played / ${track.correct} correct / ${recentConsistency}`;
+                    const timeSummary = track.times.length === 0
+                        ? "no times yet"
+                        : `avg ${formatTime(track.times.reduce((sum, time) => sum + time, 0) / track.times.length)} / best ${formatTime(Math.min(...track.times))} / worst ${formatTime(Math.max(...track.times))}`;
+                    count.textContent = `${track.played} played / ${track.correct} correct / ${recentConsistency} / ${timeSummary}`;
                     row.append(name, count);
                     return row;
                 }));
@@ -423,6 +426,7 @@
                 totalAnswers += 1;
                 totalCorrect += isCorrect ? 1 : 0;
                 answerTimes.push(answerTime);
+                currentTrack.times.push(answerTime);
                 const timeMessage = `Time: ${formatTime(answerTime)}.`;
                 if (isCorrect) {
                     feedback.textContent = `Correct! ${timeMessage}`;
