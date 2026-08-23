@@ -7,7 +7,7 @@
     <style>
         :root {
             color-scheme: light;
-            --ink: #17212b;
+            --ink: #f8ccf6;
             --muted: #65717b;
             --paper: #383738;
             --panel: #ffd3f2;
@@ -160,6 +160,19 @@
         color: var(--muted);
     }
 
+    .advanced-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 14px;
+        color: var(--ink);
+        font-size: 0.8rem;
+    }
+
+    .advanced-toggle input {
+        accent-color: var(--accent-dark);
+    }
+
     .song-stats ul {
         margin: 0;
         padding: 0;
@@ -190,23 +203,6 @@
         letter-spacing: 0.08em;
         text-transform: uppercase;
         cursor: pointer;
-    }
-
-    .submit-button {
-        margin: 16px 10px 0 0;
-        padding: 13px 18px;
-        border: 0;
-        background: var(--ink);
-        color: white;
-        font: 700 0.8rem Arial, sans-serif;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        cursor: pointer;
-    }
-
-    .submit-button:disabled {
-        background: #b9b1a9;
-        cursor: not-allowed;
     }
 
     .another-button:hover,
@@ -320,13 +316,24 @@
             statsHeading.textContent = "Song stats";
             const overallStats = document.createElement("p");
             overallStats.className = "overall-stats";
+            const advancedToggle = document.createElement("label");
+            advancedToggle.className = "advanced-toggle";
+            const advancedCheckbox = document.createElement("input");
+            advancedCheckbox.type = "checkbox";
+            advancedCheckbox.checked = false;
+            advancedToggle.append(advancedCheckbox, "Advanced stats");
             const statsList = document.createElement("ul");
-            stats.append(statsHeading, overallStats, statsList);
+            stats.append(statsHeading, overallStats, advancedToggle, statsList);
             let totalAnswers = 0;
             let totalCorrect = 0;
             const answerTimes = [];
 
             const formatTime = seconds => `${seconds.toFixed(1)}s`;
+
+            const getWeightedTracks = () => tracks.map(track => ({
+                track,
+                weight: (1 / (track.played + 1)) * (1 + track.wrong * 0.1)
+            }));
 
             const updateStats = () => {
                 const overallConsistency = totalAnswers === 0
@@ -336,6 +343,8 @@
                     ? "No answer times yet"
                     : `Avg ${formatTime(answerTimes.reduce((sum, time) => sum + time, 0) / answerTimes.length)} / Best ${formatTime(Math.min(...answerTimes))} / Worst ${formatTime(Math.max(...answerTimes))}`;
                 overallStats.textContent = `${totalAnswers} submitted / ${overallConsistency} / ${timeSummary}`;
+                const weightedTracks = getWeightedTracks();
+                const totalWeight = weightedTracks.reduce((total, item) => total + item.weight, 0);
                 statsList.replaceChildren(...tracks.map(track => {
                     const row = document.createElement("li");
                     const name = document.createElement("span");
@@ -348,17 +357,15 @@
                     const timeSummary = track.times.length === 0
                         ? "no times yet"
                         : `avg ${formatTime(track.times.reduce((sum, time) => sum + time, 0) / track.times.length)} / best ${formatTime(Math.min(...track.times))} / worst ${formatTime(Math.max(...track.times))}`;
-                    count.textContent = `${track.played} played / ${track.correct} correct / ${recentConsistency} / ${timeSummary}`;
+                    const selectionChance = weightedTracks.find(item => item.track === track).weight / totalWeight;
+                    const chanceSummary = advancedCheckbox.checked
+                        ? ` / ${Math.round(selectionChance * 1000) / 10}% chance`
+                        : "";
+                    count.textContent = `${track.played} played / ${track.correct} correct / ${recentConsistency} / ${timeSummary}${chanceSummary}`;
                     row.append(name, count);
                     return row;
                 }));
             };
-
-            const submitButton = document.createElement("button");
-			submitButton.className = "submit-button";
-            submitButton.type = "button";
-            submitButton.textContent = "Submit answer";
-            submitButton.disabled = true;
 
             const anotherButton = document.createElement("button");
 			anotherButton.className = "another-button";
@@ -372,10 +379,7 @@
 
             const startRound = () => {
                 clearTimeout(stopTimer);
-                const weightedTracks = tracks.map(track => ({
-                    track,
-                    weight: (1 / (track.played + 1)) * (1 + track.wrong * 0.1)
-                }));
+                const weightedTracks = getWeightedTracks();
                 const totalWeight = weightedTracks.reduce((total, item) => total + item.weight, 0);
                 let selectedWeight = Math.random() * totalWeight;
                 currentTrack = weightedTracks[weightedTracks.length - 1].track;
@@ -388,7 +392,6 @@
                 }
                 songSelect.value = "";
                 feedback.textContent = "";
-                submitButton.disabled = true;
                 answerSubmitted = false;
                 anotherButton.hidden = true;
                 audio.pause();
@@ -406,16 +409,11 @@
             };
 
             songSelect.addEventListener("change", () => {
-                submitButton.disabled = false;
-            });
-
-            submitButton.addEventListener("click", () => {
                 if (!songSelect.value || answerSubmitted) return;
 
                 const isCorrect = songSelect.value === currentTrack.url;
                 const answerTime = (performance.now() - roundStartedAt) / 1000;
                 answerSubmitted = true;
-                submitButton.disabled = true;
                 clearTimeout(stopTimer);
                 audio.pause();
                 currentTrack.played += 1;
@@ -437,8 +435,10 @@
                 anotherButton.hidden = false;
             });
 
+            advancedCheckbox.addEventListener("change", updateStats);
+
             anotherButton.addEventListener("click", startRound);
-            document.querySelector(".quiz-panel").append(audio, songSelect, submitButton, feedback, anotherButton);
+            document.querySelector(".quiz-panel").append(audio, songSelect, feedback, anotherButton);
             document.querySelector("main").append(stats);
             updateStats();
             startRound();
